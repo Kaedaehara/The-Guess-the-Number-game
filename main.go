@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -31,6 +32,8 @@ const (
 	ColorYellow = "\033[33m"
 )
 
+var reader = bufio.NewReader(os.Stdin)
+
 func main() {
 
 gameLoop:
@@ -46,33 +49,38 @@ gameLoop:
 
 		won := false
 
-		for remainingAttempts > 0 { // Цикл угадывания
+		for remainingAttempts > 0 {
 
-			userGuess := readGuess(maxNumber) // Ввод и валидация числа
+			isLastTry := remainingAttempts == 1
 
-			pastAttempts = append(pastAttempts, userGuess) // Добавляем предыдущую попытку пользователя
+			userGuess := readGuess(maxNumber)
 
-			resultCompare := compareGuess(userGuess, secretNumber) // Сравнение числа пользователя и загаданного
+			pastAttempts = append(pastAttempts, userGuess)
 
-			switch resultCompare {
-			case Equal:
+			resultCompare := compareGuess(userGuess, secretNumber)
+
+			if resultCompare == Equal {
 				fmt.Println(ColorGreen + "Вы угадали!🙌\nИгра закончена!" + ColorReset)
 				won = true
-			case Greater:
-				fmt.Println("Секретное число меньше👇")
-			case Less:
-				fmt.Println("Секретное число больше👆")
-			}
-
-			if won {
 				break
 			}
 
-			printHint(userGuess, secretNumber, remainingAttempts, pastAttempts)
+			if !isLastTry {
+				switch resultCompare {
+				case Greater:
+					fmt.Println("Секретное число меньше👇")
+				case Less:
+					fmt.Println("Секретное число больше👆")
+				}
+
+				printHint(userGuess, secretNumber, remainingAttempts, pastAttempts)
+			}
 
 			remainingAttempts--
 
-			fmt.Printf("Осталось попыток: %s%d%s\n", ColorYellow, remainingAttempts, ColorReset)
+			if remainingAttempts != 0 {
+				fmt.Printf("Осталось попыток: %s%d%s\n", ColorYellow, remainingAttempts, ColorReset)
+			}
 		}
 
 		if !won {
@@ -93,11 +101,10 @@ gameLoop:
 }
 
 func saveGameResult(filename string, result GameResult) error {
-	// 1) читаем файл (если нет — считаем что результатов пока нет) json в слайс байтов
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			data = []byte("[]") // пустой список в JSON
+			data = []byte("[]")
 		} else {
 			return err
 		}
@@ -107,43 +114,49 @@ func saveGameResult(filename string, result GameResult) error {
 		data = []byte("[]")
 	}
 
-	// 2) превращаем JSON-текст в слайс структур
 	var results []GameResult
 	if err := json.Unmarshal(data, &results); err != nil {
 		return err
 	}
 
-	// 3) добавляем новый результат
 	results = append(results, result)
 
-	// 4) превращаем обратно в JSON-текст
 	out, err := json.MarshalIndent(results, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	// 5) пишем файл обратно
 	return os.WriteFile(filename, out, 0644)
 }
 
 func readGuess(max int) int {
 	for {
-		var input string
-		fmt.Scanln(&input)
+		fmt.Print("Введите число: ")
+
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Ошибка ввода. Повторите.")
+			continue
+		}
+
+		input = strings.TrimSpace(input)
 
 		guess, err := strconv.Atoi(input)
 		if err != nil {
-			fmt.Println("Нужно ввести число. Повторите попытку!")
+			fmt.Println("Нужно ввести ОДНО целое число.")
 			continue
 		}
+
 		if guess <= 0 {
-			fmt.Println("Число должно быть больше нуля. Повторите попытку!")
+			fmt.Println("Число должно быть больше нуля.")
 			continue
 		}
+
 		if guess > max {
-			fmt.Printf("Число должно быть не больше %d. Повторите попытку!\n", max)
+			fmt.Printf("Число должно быть не больше %d.\n", max)
 			continue
 		}
+
 		return guess
 	}
 }
@@ -197,8 +210,7 @@ func chooseDifficulty() (int, int) {
 	)
 
 	for {
-		var diffMode string
-		fmt.Scanln(&diffMode)
+		diffMode := readLine()
 
 		switch diffMode {
 		case "1":
@@ -217,8 +229,7 @@ func askPlayAgain() bool {
 	fmt.Println("Хотите сыграть ещё раз?\nВведите \"да\" или \"нет\"")
 
 	for {
-		var answer string
-		fmt.Scanln(&answer)
+		answer := readLine()
 
 		switch strings.ToLower(strings.TrimSpace(answer)) {
 		case "да", "д", "yes", "y":
@@ -241,4 +252,12 @@ func makeGameResult(won bool, attempts int) GameResult {
 		Outcome:  outcome,
 		Attempts: attempts,
 	}
+}
+
+func readLine() string {
+	s, err := reader.ReadString('\n')
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(s)
 }
