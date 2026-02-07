@@ -18,4 +18,4 @@
 ```bash
 git clone https://github.com/Kaedaehara/The-Guess-the-Number-game.git
 cd The-Guess-the-Number-game
-go run .
+go run ./main
